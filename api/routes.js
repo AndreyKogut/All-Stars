@@ -1,0 +1,1 @@
+const signInController = require('./signin');module.exports = routes;function routes(server) {  signInController(server);}
