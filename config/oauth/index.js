@@ -1,1 +1,3 @@
-const oauth = require('./oauthConfig');module.exports = oauth;
+const oauth = require('./oauthConfig');
+
+module.exports = oauth;
