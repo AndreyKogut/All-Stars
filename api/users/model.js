@@ -6,8 +6,8 @@ const usersSchema = new Schema({
   password: String,
   username: String,
   auth: {
-    accessTokens: [],
-    refreshTokens: [],
+    accessTokens: Array,
+    refreshTokens: Array,
   },
 });
 
