@@ -148,9 +148,9 @@ function storiesController(server) {
   server.get('/api/stories/:id', server.oauth.authorise(), (req, res) => {
     const where = { _id: req.params.id };
 
-    Stories.findOne(where, errorHandler(res, getStories));
+    Stories.findOne(where, errorHandler(res, getStory));
 
-    function getStories(story) {
+    function getStory(story) {
       res.send(story);
     }
   });

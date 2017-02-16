@@ -3,6 +3,7 @@ const validation = require('../helpers/validation');
 const errorHandler = require('../helpers/callbackErrorHandler');
 const Users = require('../users/model');
 const Stories = require('../stories/model');
+const Events = require('../events/model');
 
 module.exports = usersController;
 
@@ -254,6 +255,27 @@ function usersController(server) {
     function findUsers(story) {
       if (story) {
         const usersWhere = { _id: { $in: story.likes } };
+        const usersOptions = { password: 0, auth: 0, __v: 0 };
+        Users.find(usersWhere, usersOptions, errorHandler(res, getUsers));
+      } else {
+        res.send([]);
+      }
+    }
+
+    function getUsers(users) {
+      res.send(users);
+    }
+  });
+
+  server.get('/api/events/:id/participants', server.oauth.authorise(), (req, res) => {
+    const where = { _id: req.params.id };
+    const options = { participants: 1 };
+
+    Events.findOne(where, options, errorHandler(res, findUsers));
+
+    function findUsers(event) {
+      if (event) {
+        const usersWhere = { _id: { $in: event.participants } };
         const usersOptions = { password: 0, auth: 0, __v: 0 };
         Users.find(usersWhere, usersOptions, errorHandler(res, getUsers));
       } else {

@@ -5,8 +5,9 @@ const eventsSchema = new Schema({
   creator: String,
   name: String,
   description: String,
+  image: String,
   date: String,
-  likes: Array,
+  participants: Array,
 });
 
 const Events = mongoose.model('events', eventsSchema);
