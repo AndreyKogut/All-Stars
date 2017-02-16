@@ -5,7 +5,11 @@ function callbackErrorHandler(res, callback) {
     if (err) {
       res.sendStatus(503);
     } else {
-      callback(result);
+      if (!callback) {
+        res.sendStatus(200);
+      } else {
+        callback(result);
+      }
     }
   }
 }

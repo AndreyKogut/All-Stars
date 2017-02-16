@@ -2,18 +2,12 @@ const _ = require('lodash');
 const validation = require('../helpers/validation');
 const errorHandler = require('../helpers/callbackErrorHandler');
 const Users = require('../users/model');
+const Stories = require('../stories/model');
 
 module.exports = usersController;
 
 function usersController(server) {
   server.post('/api/join', (req, res) => {
-    const where = {
-      $or: [ {
-        email: req.body.email,
-      },{
-        username: req.body.username,
-      }]
-    };
     const requestDataStructure = {
       email: {
         notEmpty: true,
@@ -33,6 +27,14 @@ function usersController(server) {
     validation(req, res, requestDataStructure, create);
 
     function create() {
+      const where = {
+        $or: [{
+          email: req.body.email,
+        },{
+          username: req.body.username,
+        }]
+      };
+
       Users.findOne(where, errorHandler(res, getUser));
     }
 
@@ -44,13 +46,10 @@ function usersController(server) {
           res.status(403).send('Username already exist');
         }
       } else {
-        const requestUser = Users(req.body);
+        const userData = _.pick(req.body, ['email', 'password', 'username']);
+        const requestUser = Users(userData);
 
-        requestUser.save((err) => {
-          if (err) res.sendStatus(503);
-
-          res.sendStatus(200);
-        });
+        requestUser.save(errorHandler(res));
       }
     }
   });
@@ -74,27 +73,30 @@ function usersController(server) {
     validation(req, res, requestDataStructure, update);
 
     function update() {
-      // pick to prevent updating protected fields
-      const updateData = _.pick(req.body, [ 'username', 'about', 'avatar' ]);
-      const where = { _id: req.user._id };
-      const doc = { $set: updateData };
+      const whereUsername = { username: req.body.username };
 
-      Users.findOneAndUpdate(where, doc, errorHandler(res, success));
+      Users.findOne(whereUsername, errorHandler(res, findUser));
     }
 
-    function success() {
-      res.sendStatus(200);
+    function findUser(user) {
+      if (!user) {
+        const updateData = _.pick(req.body, ['username', 'about', 'avatar']);
+        const where = { _id: req.user._id };
+        const doc = { $set: updateData };
+
+        Users.findOneAndUpdate(where, doc, errorHandler(res));
+      } else {
+        res.status(403).send('Username already exist');
+      }
     }
   });
 
-  server.put('/api/users/:id', server.oauth.authorise(), (req, res) => {
-    const profileId = req.user._id;
-    const requestUserId = req.params.id;
+  server.put('/api/users/:id/subscriptions', server.oauth.authorise(), (req, res) => {
     const requestDataStructure = {
       id: {
         notEmpty: true,
         isLength: {
-          options: [ 24 ],
+          options: [24],
         },
         errorMessage: 'Invalid id',
       }
@@ -103,26 +105,22 @@ function usersController(server) {
     validation(req, res, requestDataStructure, subscribe);
 
     function subscribe() {
+      const requestUserId = req.params.id;
       const where = {
-        _id: profileId,
+        _id: req.user._id,
         subscriptions: {
-          $ne: requestUserId
+          $ne: requestUserId,
         },
       };
       const doc = { $push: { subscriptions: requestUserId } };
 
-      Users.findOneAndUpdate(where, doc, errorHandler(res, userUpdate));
-    }
-
-    function userUpdate() {
-      res.sendStatus(200);
+      Users.findOneAndUpdate(where, doc, errorHandler(res));
     }
   });
 
   server.put('/api/interests', server.oauth.authorise(), (req, res) => {
-    const userId = req.user._id;
     const where = {
-      _id: userId,
+      _id: req.user._id,
     };
     const doc = {
       interests: _
@@ -145,57 +143,35 @@ function usersController(server) {
     validation(req, res, requestDataStructure, putInterests);
 
     function putInterests() {
-      Users.findOneAndUpdate(where, doc, errorHandler(res, success));
-    }
-
-    function success() {
-      res.sendStatus(200);
+      Users.findOneAndUpdate(where, doc, errorHandler(res));
     }
   });
 
   server.delete('/api/profile', server.oauth.authorise(), (req, res) => {
     const where = { _id: req.user._id };
 
-    Users.remove(where, errorHandler(res, success));
-
-    function success() {
-      res.sendStatus(200);
-    }
+    Users.remove(where, errorHandler(res));
   });
 
-  server.delete('/api/users/:id', server.oauth.authorise(), (req, res) => {
-    const profileId = req.user._id;
-    const requestUserId = req.params.id;
-
+  server.delete('/api/users/:id/subscriptions', server.oauth.authorise(), (req, res) => {
+    const requestUser = req.params.id;
     const where = {
-      _id: profileId,
-      subscriptions: requestUserId,
+      _id: req.user._id,
     };
-    const doc = { $pull: { subscriptions: requestUserId } };
+    const doc = { $pull: { subscriptions: requestUser } };
 
-    Users.findOneAndUpdate(where, doc, errorHandler(res, removed));
-
-    function removed() {
-      res.sendStatus(200);
-    }
+    Users.findOneAndUpdate(where, doc, errorHandler(res));
   });
 
   server.delete('/api/interests/:name', server.oauth.authorise(), (req, res) => {
-    const userId = req.user._id;
-    const where = {
-      _id: userId,
-    };
+    const where = { _id: req.user._id };
     const doc = {
       $pull: {
         interests: req.params.name,
       },
     };
 
-    Users.findOneAndUpdate(where, doc, errorHandler(res, success));
-
-    function success() {
-      res.sendStatus(200);
-    }
+    Users.findOneAndUpdate(where, doc, errorHandler(res));
   });
 
   server.get('/api/login', server.oauth.authorise(), (req, res) => {
@@ -261,6 +237,27 @@ function usersController(server) {
         const where = { _id: { $in: subscribers } };
         const options = { auth: 0, password: 0 };
         Users.find(where, options, errorHandler(res, getUsers));
+      }
+    }
+
+    function getUsers(users) {
+      res.send(users);
+    }
+  });
+
+  server.get('/api/stories/:id/likes', server.oauth.authorise(), (req, res) => {
+    const where = { _id: req.params.id };
+    const options = { likes: 1 };
+
+    Stories.findOne(where, options, errorHandler(res, findUsers));
+
+    function findUsers(story) {
+      if (story) {
+        const usersWhere = { _id: { $in: story.likes } };
+        const usersOptions = { password: 0, auth: 0, __v: 0 };
+        Users.find(usersWhere, usersOptions, errorHandler(res, getUsers));
+      } else {
+        res.send([]);
       }
     }
 

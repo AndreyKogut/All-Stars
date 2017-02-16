@@ -5,7 +5,7 @@ const storiesSchema = new Schema({
   creator: String,
   name: String,
   text: String,
-  data: String,
+  date: String,
   image: String,
   likes: Array,
 });
