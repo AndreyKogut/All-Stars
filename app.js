@@ -22,14 +22,13 @@ app.use(validator({
 mongoose.connect(config.getConnectionString());
 
 config.oauthConfig(app);
-
 routes(app);
 
 app.use(app.oauth.errorHandler());
 
 // basic error handler for not auth errors
 app.use(function (err, req, res, next) {
-  // console.log(err);
+  console.log(err);
   res.status(403).send('Invalid data type');
 });
 

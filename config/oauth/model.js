@@ -32,7 +32,7 @@ function grantTypeAllowed(clientId, grantType, callback) {
 }
 
 function getUser(username, password, callback) {
-  Users.findOne({ username }, (err, user) => {
+  Users.findOne({ username, password }, (err, user) => {
     if (err) {
       callback();
     } else {
