@@ -96,9 +96,7 @@ function usersController(server) {
     const requestDataStructure = {
       id: {
         notEmpty: true,
-        isLength: {
-          options: [24],
-        },
+        isValidId: true,
         errorMessage: 'Invalid id',
       }
     };
