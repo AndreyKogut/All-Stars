@@ -13,13 +13,14 @@ app.wsInstance = webSocket(app);
 
 app.use(validator());
 app.use('/', express.static(`${__dirname}/client/app`));
+app.use(express.static('uploads'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(validator({
   customValidators: {
-    isArray: (value) => _.isArray(value),
-    interestsLimit: (value) => value.length <= 10,
-    isValidId: (value) => ObjectId.isValid(value),
+    isArray: value => _.isArray(value),
+    interestsLimit: value => value.length <= 10,
+    isValidId: value => ObjectId.isValid(value),
   },
 }));
 
