@@ -3,12 +3,13 @@ const Chats = require('./model');
 const Users = require('../users/model');
 const chatMethods = require('./methods');
 const validation = require('../helpers/validation');
+const ASError = require('../helpers/Error');
 const errorHandler = require('../helpers/callbackErrorHandler');
 
 module.exports = chatController;
 
 function chatController(server) {
-  server.post('/api/chat', server.oauth.authorise(), (req, res) => {
+  server.post('/api/chat', server.oauth.authorise(), (req, res, next) => {
     const requestDataStructure = {
       theme: {
         optional: true,
@@ -19,7 +20,7 @@ function chatController(server) {
       },
     };
 
-    validation(req, res, requestDataStructure, update);
+    validation(req, requestDataStructure, update);
 
     function update() {
       const where = {
@@ -37,13 +38,13 @@ function chatController(server) {
           chatMethods.changeTheme(server, chat);
           res.sendStatus(200);
         } else {
-          res.status(403).send('Invalid changes')
+          next(ASError(403, 'Invalid changes'));
         }
       }
     }
   });
 
-  server.put('/api/chat/:state', server.oauth.authorise(), (req, res) => {
+  server.put('/api/chat/:state', server.oauth.authorise(), (req, res, next) => {
     const states = {
       on: true,
       off: false,
@@ -51,6 +52,12 @@ function chatController(server) {
     const requestedState = req.params.state;
 
     if (_.has(states, requestedState)) {
+      update();
+    } else {
+      next(new ASError(403, 'Invalid chat state'));
+    }
+
+    function update() {
       const where = { owner: req.user._id };
       const doc = { enabled: states[requestedState] };
 
@@ -60,8 +67,6 @@ function chatController(server) {
       }
 
       Chats.findOneAndUpdate(where, doc, { new: true }, errorHandler(res, handleChat));
-    } else {
-      res.status(403).send('Invalid chat state');
     }
 
     function handleChat(chat) {
@@ -89,7 +94,7 @@ function chatController(server) {
     }
   });
 
-  server.put('/api/chat/blacklist/:id', server.oauth.authorise(), (req, res) => {
+  server.put('/api/chat/blacklist/:id', server.oauth.authorise(), (req, res, next) => {
     const requestDataStructure = {
       id: {
         notEmpty: true,
@@ -98,7 +103,7 @@ function chatController(server) {
       },
     };
 
-    validation(req, res, requestDataStructure, addUser);
+    validation(req, requestDataStructure, addUser);
 
     function addUser() {
       const userId = req.params.id;
@@ -126,12 +131,11 @@ function chatController(server) {
       Chats.findOneAndUpdate(where, doc, errorHandler(res, getChat));
 
       function getChat(chat) {
-        if (!chat) {
-          res.status(403).send('You cant block this user');
-        } else {
+        if (chat) {
           chatMethods.banUser(server, String(chat._id), userId);
-
           res.sendStatus(200);
+        } else {
+          next(new ASError(403, 'You cant block this user'));
         }
       }
     }
@@ -146,7 +150,7 @@ function chatController(server) {
       },
     };
 
-    validation(req, res, requestDataStructure, removeUser);
+    validation(req, requestDataStructure, removeUser);
 
     function removeUser() {
       const userId = req.params.id;
@@ -215,7 +219,7 @@ function chatController(server) {
     }
   });
 
-  server.get('/api/chats/:id/messages', server.oauth.authorise(), (req, res) => {
+  server.get('/api/chats/:id/messages', server.oauth.authorise(), (req, res, next) => {
     const where = {
       _id: req.params.id,
       blacklist: {
@@ -227,10 +231,9 @@ function chatController(server) {
 
     function getMessages(chat) {
       if (chat) {
-        console.log(chat);
         res.send(chat.messages);
       } else {
-        res.status(403).send('Baned by creator');
+        next(new ASError(403, 'Baned by creator'));
       }
     }
   });
@@ -295,8 +298,8 @@ function joinChat(client, req, next) {
         req.user = user;
         client.user = user;
         client.subscriptions = chats
-        .filter(chat => !_.indexOf(chat.blacklist, user._id) + 1)
-        .map(chat => String(chat._id));
+          .filter(chat => !_.indexOf(chat.blacklist, user._id) + 1)
+          .map(chat => String(chat._id));
 
         next();
       }

@@ -4,6 +4,7 @@ const Schema = mongoose.Schema;
 const imageSchema = new Schema({
   creator: String,
   url: String,
+  type: [String],
   date: String,
 });
 

@@ -4,11 +4,12 @@ const errorHandler = require('../helpers/callbackErrorHandler');
 const Users = require('../users/model');
 const Stories = require('../stories/model');
 const Events = require('../events/model');
+const ASError = require('../helpers/Error');
 
 module.exports = usersController;
 
 function usersController(server) {
-  server.post('/api/join', (req, res) => {
+  server.post('/api/join', (req, res, next) => {
     const requestDataStructure = {
       email: {
         notEmpty: true,
@@ -25,7 +26,7 @@ function usersController(server) {
       },
     };
 
-    validation(req, res, requestDataStructure, create);
+    validation(req, requestDataStructure, create);
 
     function create() {
       const where = {
@@ -42,9 +43,9 @@ function usersController(server) {
     function getUser(user) {
       if (user) {
         if (user.email === req.body.email) {
-          res.status(403).send('Email already exist');
+          next(new ASError(403, 'Email already exist'));
         } else {
-          res.status(403).send('Username already exist');
+          next(new ASError(403, 'Username already exist'));
         }
       } else {
         const userData = _.pick(req.body, ['email', 'password', 'username']);
@@ -55,7 +56,7 @@ function usersController(server) {
     }
   });
 
-  server.post('/api/profile', server.oauth.authorise(), (req, res) => {
+  server.post('/api/profile', server.oauth.authorise(), (req, res, next) => {
     const requestDataStructure = {
       username: {
         optional: true,
@@ -71,7 +72,7 @@ function usersController(server) {
       },
     };
 
-    validation(req, res, requestDataStructure, update);
+    validation(req, requestDataStructure, update);
 
     function update() {
       const whereUsername = { username: req.body.username };
@@ -80,14 +81,14 @@ function usersController(server) {
     }
 
     function findUser(user) {
-      if (!user) {
+      if (user) {
+        next(new ASError(403, 'Username already exist'));
+      } else {
         const updateData = _.pick(req.body, ['username', 'about', 'avatar']);
         const where = { _id: req.user._id };
         const doc = { $set: updateData };
 
         Users.findOneAndUpdate(where, doc, errorHandler(res));
-      } else {
-        res.status(403).send('Username already exist');
       }
     }
   });
@@ -101,7 +102,7 @@ function usersController(server) {
       }
     };
 
-    validation(req, res, requestDataStructure, subscribe);
+    validation(req, requestDataStructure, subscribe);
 
     function subscribe() {
       const requestUserId = req.params.id;
@@ -118,16 +119,6 @@ function usersController(server) {
   });
 
   server.put('/api/interests', server.oauth.authorise(), (req, res) => {
-    const where = {
-      _id: req.user._id,
-    };
-    const doc = {
-      interests: _
-      .chain(req.body.interests)
-      .map(item => item.toLowerCase())
-      .uniq(req.body.interests),
-    };
-
     const requestDataStructure = {
       interests: {
         notEmpty: true,
@@ -139,7 +130,18 @@ function usersController(server) {
       },
     };
 
-    validation(req, res, requestDataStructure, putInterests);
+    validation(req, requestDataStructure, putInterests);
+
+    const where = {
+      _id: req.user._id,
+    };
+    const doc = {
+      interests: _
+        .chain(req.body.interests)
+        .map(item => item.toLowerCase())
+        .uniq()
+        .value(),
+    };
 
     function putInterests() {
       Users.findOneAndUpdate(where, doc, errorHandler(res));

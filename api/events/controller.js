@@ -2,6 +2,7 @@ const _ = require('lodash');
 const Events = require('./model');
 const validation = require('../helpers/validation');
 const errorHandler = require('../helpers/callbackErrorHandler');
+const ASError = require('../helpers/Error');
 
 module.exports = eventsController;
 
@@ -27,7 +28,7 @@ function eventsController(server) {
       },
     };
 
-    validation(req, res, requestDataStructure, create);
+    validation(req, requestDataStructure, create);
 
     function create() {
       const requestData = _.pick(req.body, ['name', 'description', 'image']);
@@ -45,7 +46,7 @@ function eventsController(server) {
     }
   });
 
-  server.post('/api/events/:id', server.oauth.authorise(), (req, res) => {
+  server.post('/api/events/:id', server.oauth.authorise(), (req, res, next) => {
     const requestDataStructure = {
       name: {
         optional: true,
@@ -75,7 +76,7 @@ function eventsController(server) {
       $set: _.pick(req.body, ['name', 'description', 'image']),
     };
 
-    validation(req, res, requestDataStructure, update);
+    validation(req, requestDataStructure, update);
 
     function update() {
       Events.findOneAndUpdate(where, doc, errorHandler(res, handleUpdate));
@@ -85,7 +86,7 @@ function eventsController(server) {
       if (event) {
         res.sendStatus(200);
       } else {
-        res.status(403).send('Not creator');
+        next(new ASError(403, 'Not creator'));
       }
     }
   });

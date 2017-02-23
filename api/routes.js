@@ -1,3 +1,4 @@
+const errorHandler = require('./helpers/errorHandler');
 const oauthController = require('./oauth/constroller');
 const usersController = require('./users/controller');
 const storiesController = require('./stories/controller');
@@ -14,4 +15,6 @@ function routes(server) {
   eventsController(server);
   chatsController(server);
   imagesController(server);
+  server.use(server.oauth.errorHandler());
+  server.use(errorHandler);
 }
