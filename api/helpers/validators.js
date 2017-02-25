@@ -17,4 +17,5 @@ module.exports = {
   },
   interestsLimit: value => value.length <= 10,
   isValidId: value => ObjectId.isValid(value),
+  isPositiveNumber: value => value >= 0,
 };

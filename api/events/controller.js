@@ -136,10 +136,64 @@ function eventsController(server) {
     Events.remove(where, errorHandler(res));
   });
 
-  server.get('/api/events', server.oauth.authorise(), (req, res) => {
-    const where = { creator: req.user._id };
+  server.get('/api/profile/events', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+    };
 
-    Events.find(where, errorHandler(res, getEvents));
+    validation(req, requestDataStructure, findEvents, next);
+
+    function findEvents() {
+      const where = { creator: req.user._id };
+
+      Events
+        .find(where, errorHandler(res, getEvents))
+        .skip(Number(req.query.skip))
+        .limit(Number(req.query.count));
+    }
+
+    function getEvents(Events) {
+      res.send(Events);
+    }
+  });
+
+  server.get('/api/users/:id/events', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+    };
+
+    validation(req, requestDataStructure, findEvents, next);
+
+    function findEvents() {
+      const where = { creator: req.params.id };
+
+      Events
+        .find(where, errorHandler(res, getEvents))
+        .skip(Number(req.query.skip))
+        .limit(Number(req.query.count));
+    }
 
     function getEvents(Events) {
       res.send(Events);

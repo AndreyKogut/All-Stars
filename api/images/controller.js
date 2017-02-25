@@ -74,15 +74,26 @@ function imagesController(server) {
       }
     });
 
-  server.get('/api/profile/images', server.oauth.authorise(), (req, res) => {
-    const where = {
-      creator: req.user._id,
+  server.post('/api/images/:id', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      type: {
+        isImageTypesArray: true,
+        errorMessage: 'Invalid image type',
+      }
     };
 
-    Images.find(where, errorHandler(res, getImages));
+    validate(req, requestDataStructure, update, next);
 
-    function getImages(images) {
-      res.send(images);
+    function update() {
+      const where = {
+        _id: req.params.id,
+        creator: req.user._id,
+      };
+      const doc = {
+        type: req.body.type,
+      };
+
+      Images.findOneAndUpdate(where, doc, errorHandler(res));
     }
   });
 
@@ -104,26 +115,89 @@ function imagesController(server) {
     }
   });
 
-  server.post('/api/images/:id', server.oauth.authorise(), (req, res, next) => {
+  server.get('/api/profile/images', server.oauth.authorise(), (req, res, next) => {
     const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
       type: {
+        optional: true,
         isImageTypesArray: true,
-        errorMessage: 'Invalid image type',
-      }
+        errorMessage: 'Invalid type query'
+      },
     };
 
-    validate(req, requestDataStructure, update, next);
+    validate(req, requestDataStructure, findImages, next);
 
-    function update() {
+    function findImages() {
+      const type = req.query.type;
       const where = {
-        _id: req.params.id,
         creator: req.user._id,
       };
-      const doc = {
-        type: req.body.type,
-      };
+      if (type) {
+        where.type = type;
+      }
 
-      Images.findOneAndUpdate(where, doc, errorHandler(res));
+      Images
+        .find(where, errorHandler(res, getImages))
+        .skip(Number(req.query.skip))
+        .limit(Number(req.query.count));
+    }
+
+    function getImages(images) {
+      res.send(images);
+    }
+  });
+
+  server.get('/api/users/:id/images', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+      type: {
+        optional: true,
+        isImageType: true,
+        errorMessage: 'Invalid type query'
+      },
+    };
+
+    validate(req, requestDataStructure, findImages, next);
+
+    function findImages() {
+      const type = req.query.type;
+      const where = {
+        creator: req.params.id,
+      };
+      if (type) {
+        where.type = type;
+      }
+
+      Images
+        .find(where, errorHandler(res, getImages))
+        .skip(Number(req.query.skip))
+        .limit(Number(req.query.count));
+    }
+
+    function getImages(images) {
+      res.send(images);
     }
   });
 

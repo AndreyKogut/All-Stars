@@ -15,8 +15,8 @@ function chatController(server) {
         optional: true,
         isLength: {
           options: { max: 50 },
+          errorMessage: 'Invalid theme length',
         },
-        errorMessage: 'Invalid theme length',
       },
     };
 
@@ -183,29 +183,62 @@ function chatController(server) {
     }
   });
 
-  server.get('/api/chats', server.oauth.authorise(), (req, res) => {
-    const where = {
-      $or: [{
-        owner: req.user._id,
-      }, {
-        'messages.creator': req.user._id,
-      }],
+  server.get('/api/chats', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
     };
 
-    Chats.find(where, errorHandler(res, getChats));
+    validation(req, requestDataStructure, findChats, next);
+
+    function findChats() {
+      const where = {
+        $or: [{
+          owner: req.user._id,
+        }, {
+          'messages.creator': req.user._id,
+          blacklist: {
+            $ne: String(req.user._id),
+          },
+        }],
+      };
+
+      Chats
+        .find(where, errorHandler(res, getChats))
+        .skip(Number(req.query.skip))
+        .limit(Number(req.query.count));
+    }
 
     function getChats(chats) {
-      res.send(chats);
+      const transform = _.map(chats, chat => _.assignWith(chat.toJSON(), {
+        isOwner: chat.owner === String(req.user._id),
+      }));
+
+      res.send(transform);
     }
   });
 
-  server.get('/api/chat', server.oauth.authorise(), (req, res) => {
+  server.get('/api/profile/chat', server.oauth.authorise(), (req, res) => {
     const where = { owner: req.user._id };
 
     Chats.findOne(where, errorHandler(res, getChat));
 
     function getChat(chat) {
-      res.send(chat);
+      const transform = _.assignWith(chat.toJSON(), {
+        isOwner: true,
+      });
+
+      res.send(transform);
     }
   });
 
@@ -215,19 +248,46 @@ function chatController(server) {
     Chats.findOne(where, errorHandler(res, getChat));
 
     function getChat(chat) {
-      res.send(chat);
+      const transform = _.assignWith(chat.toJSON(), {
+        isOwner: chat.owner === String(req.user._id),
+      });
+
+      res.send(transform);
     }
   });
 
   server.get('/api/chats/:id/messages', server.oauth.authorise(), (req, res, next) => {
-    const where = {
-      _id: req.params.id,
-      blacklist: {
-        $nin: [req.user._id],
+    const requestDataStructure = {
+      from: {
+        notEmpty: true,
+        isInt: true,
+        errorMessage: 'Invalid from query',
+      },
+      to: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid to query',
       },
     };
 
-    Chats.findOne(where, errorHandler(res, getMessages));
+    validation(req, requestDataStructure, getChat, next);
+
+    function getChat() {
+      const where = {
+        _id: req.params.id,
+        blacklist: {
+          $nin: [req.user._id],
+        },
+      };
+      const options = {
+        messages: {
+          $slice: [Number(req.query.from), Number(req.query.to)],
+        },
+      };
+
+      Chats.findOne(where, options, errorHandler(res, getMessages));
+    }
 
     function getMessages(chat) {
       if (chat) {

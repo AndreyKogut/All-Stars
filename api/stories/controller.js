@@ -130,16 +130,70 @@ function storiesController(server) {
     Stories.remove(where, errorHandler(res));
   });
 
-  server.delete('/api/stories', server.oauth.authorise(), (req, res) => {
+  server.delete('/api/profile/stories', server.oauth.authorise(), (req, res) => {
     const where = { creator: req.user._id };
 
     Stories.remove(where, errorHandler(res));
   });
 
-  server.get('/api/stories', server.oauth.authorise(), (req, res) => {
-    const where = { creator: req.user._id };
+  server.get('/api/users/:id/stories', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+    };
 
-    Stories.find(where, errorHandler(res, getStories));
+    validation(req, requestDataStructure, findStories, next);
+
+    function findStories() {
+      const where = { creator: req.params.id };
+
+      Stories
+        .find(where, errorHandler(res, getStories))
+        .skip(Number(req.query.skip))
+        .limit(Number(req.query.count));
+    }
+
+    function getStories(stories) {
+      res.send(stories);
+    }
+  });
+
+  server.get('/api/profile/stories', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+    };
+
+    validation(req, requestDataStructure, findStories, next);
+
+    function findStories() {
+      const where = { creator: req.user._id };
+
+      Stories
+        .find(where, errorHandler(res, getStories))
+        .skip(Number(req.query.skip))
+        .limit(Number(req.query.count));
+    }
 
     function getStories(stories) {
       res.send(stories);

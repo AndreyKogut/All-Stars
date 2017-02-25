@@ -1,0 +1,7 @@
+{
+  "username": "all-stars",
+  "password": "12345678",
+  "client_id": "clientid",
+  "client_secret": "123456",
+  "grants": ["password", "refresh_token"]
+}

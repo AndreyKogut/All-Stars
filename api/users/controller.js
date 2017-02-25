@@ -1,6 +1,7 @@
 const _ = require('lodash');
 const validation = require('../helpers/validation');
 const errorHandler = require('../helpers/callbackErrorHandler');
+const imagesMethods = require('../images/methods');
 const Users = require('../users/model');
 const Stories = require('../stories/model');
 const Events = require('../events/model');
@@ -68,7 +69,7 @@ function usersController(server) {
       },
       avatar: {
         optional: true,
-        errorMessage: 'Invalid avatar'
+        errorMessage: 'Invalid avatar',
       },
     };
 
@@ -99,7 +100,7 @@ function usersController(server) {
         notEmpty: true,
         isValidId: true,
         errorMessage: 'Invalid id',
-      }
+      },
     };
 
     validation(req, requestDataStructure, subscribe);
@@ -151,7 +152,12 @@ function usersController(server) {
   server.delete('/api/profile', server.oauth.authorise(), (req, res) => {
     const where = { _id: req.user._id };
 
-    Users.remove(where, errorHandler(res));
+    Users.remove(where, errorHandler(res, removeImages));
+
+    function removeImages(user) {
+      imagesMethods.removeUserImages(user._id);
+      res.sendStatus(200);
+    }
   });
 
   server.delete('/api/users/:id/subscriptions', server.oauth.authorise(), (req, res) => {
@@ -175,17 +181,6 @@ function usersController(server) {
     Users.findOneAndUpdate(where, doc, errorHandler(res));
   });
 
-  server.get('/api/login', server.oauth.authorise(), (req, res) => {
-    const where = { _id: req.user._id };
-    const options = { __v: 0, password: 0, auth: 0 };
-
-    Users.findOne(where, options, errorHandler(res, getUser));
-
-    function getUser(user) {
-      res.send(user);
-    }
-  });
-
   server.get('/api/profile', server.oauth.authorise(), (req, res) => {
     const userId = req.user._id;
     const where = { _id: userId };
@@ -198,11 +193,57 @@ function usersController(server) {
     }
   });
 
-  server.get('/api/users', server.oauth.authorise(), (req, res) => {
-    const where = { _id: { $ne: req.user._id } };
-    const options = { auth: 0, password: 0, __v: 0 };
+  server.get('/api/users', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+      name: {
+        optional: true,
+      },
+      interests: {
+        optional: true,
+        isArray: true,
+        errorMessage: 'Invalid interests',
+      },
+    };
 
-    Users.find(where, options, errorHandler(res, getUsers));
+    validation(req, requestDataStructure, findUsers, next);
+
+    function findUsers() {
+      const interests = req.query.interests;
+      const name = req.query.name;
+      const where = {
+        _id: {
+          $ne: req.user._id,
+        },
+      };
+      if (name) {
+        where.username = {
+          $regex: `.*${name}.*`,
+        };
+      }
+      if (interests) {
+        where.interests = {
+          $in: interests,
+        };
+      }
+      const options = { auth: 0, password: 0, __v: 0 };
+
+      Users
+        .find(where, options, errorHandler(res, getUsers))
+        .skip(Number(req.query.skip))
+        .limit(Number(req.query.count));
+    }
 
     function getUsers(users) {
       res.send(users);
@@ -223,11 +264,30 @@ function usersController(server) {
     }
   });
 
-  server.get('/api/subscriptions', server.oauth.authorise(), (req, res) => {
-    const where = { _id: req.user._id };
-    const options = { subscriptions: 1 };
+  server.get('/api/profile/subscriptions', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+    };
 
-    Users.findOne(where, options, errorHandler(res, getSubscribers));
+    validation(req, requestDataStructure, getSubscriptions, next);
+
+    function getSubscriptions() {
+      const where = { _id: req.user._id };
+      const options = { subscriptions: 1 };
+
+      Users.findOne(where, options, errorHandler(res, getSubscribers));
+    }
 
     function getSubscribers(user) {
       const subscribers = user.subscriptions;
@@ -237,7 +297,11 @@ function usersController(server) {
       } else {
         const where = { _id: { $in: subscribers } };
         const options = { auth: 0, password: 0 };
-        Users.find(where, options, errorHandler(res, getUsers));
+
+        Users
+          .find(where, options, errorHandler(res, getUsers))
+          .skip(Number(req.query.skip))
+          .limit(Number(req.query.count));
       }
     }
 
@@ -246,17 +310,39 @@ function usersController(server) {
     }
   });
 
-  server.get('/api/stories/:id/likes', server.oauth.authorise(), (req, res) => {
-    const where = { _id: req.params.id };
-    const options = { likes: 1 };
+  server.get('/api/stories/:id/likes', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+    };
 
-    Stories.findOne(where, options, errorHandler(res, findUsers));
+    validation(req, requestDataStructure, getStory, next);
+
+    function getStory() {
+      const where = { _id: req.params.id };
+      const options = { likes: 1 };
+
+      Stories.findOne(where, options, errorHandler(res, findUsers));
+    }
 
     function findUsers(story) {
       if (story) {
         const usersWhere = { _id: { $in: story.likes } };
         const usersOptions = { password: 0, auth: 0, __v: 0 };
-        Users.find(usersWhere, usersOptions, errorHandler(res, getUsers));
+        Users
+          .find(usersWhere, usersOptions, errorHandler(res, getUsers))
+          .skip(Number(req.query.skip))
+          .limit(Number(req.query.count));
       } else {
         res.send([]);
       }
@@ -267,17 +353,39 @@ function usersController(server) {
     }
   });
 
-  server.get('/api/events/:id/participants', server.oauth.authorise(), (req, res) => {
-    const where = { _id: req.params.id };
-    const options = { participants: 1 };
+  server.get('/api/events/:id/participants', server.oauth.authorise(), (req, res, next) => {
+    const requestDataStructure = {
+      skip: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid skip query',
+      },
+      count: {
+        notEmpty: true,
+        isInt: true,
+        isPositiveNumber: true,
+        errorMessage: 'Invalid count query',
+      },
+    };
 
-    Events.findOne(where, options, errorHandler(res, findUsers));
+    validation(req, requestDataStructure, getEvent, next);
+
+    function getEvent() {
+      const where = { _id: req.params.id };
+      const options = { participants: 1 };
+
+      Events.findOne(where, options, errorHandler(res, findUsers));
+    }
 
     function findUsers(event) {
       if (event) {
         const usersWhere = { _id: { $in: event.participants } };
         const usersOptions = { password: 0, auth: 0, __v: 0 };
-        Users.find(usersWhere, usersOptions, errorHandler(res, getUsers));
+        Users
+          .find(usersWhere, usersOptions, errorHandler(res, getUsers))
+          .skip(Number(req.query.skip))
+          .limit(Number(req.query.count));
       } else {
         res.send([]);
       }
