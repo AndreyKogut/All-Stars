@@ -3,10 +3,13 @@ const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const validator = require('express-validator');
 const webSocket = require('express-ws');
+
 const customValidators = require('./api/helpers/validators.js');
 const config = require('./config');
 const routes = require('./api/routes');
 const errorHandler = require('./api/helpers/errorHandler');
+
+const port = process.env.PORT || 8080;
 const app = express();
 app.wsInstance = webSocket(app);
 
@@ -22,4 +25,4 @@ config.oauthConfig(app);
 
 routes(app);
 
-app.listen(3000);
+app.listen(port);
