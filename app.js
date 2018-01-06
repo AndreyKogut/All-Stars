@@ -9,6 +9,14 @@ const config = require('./config');
 const routes = require('./api/routes');
 const errorHandler = require('./api/helpers/errorHandler');
 
+const allowCrossDomain = (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:4200');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  next();
+};
+
 const port = process.env.PORT || 8080;
 const app = express();
 app.wsInstance = webSocket(app);
@@ -23,6 +31,7 @@ app.use(validator({ customValidators }));
 mongoose.connect(config.getConnectionString());
 config.oauthConfig(app);
 
+app.use(allowCrossDomain);
 routes(app);
 
 app.listen(port);

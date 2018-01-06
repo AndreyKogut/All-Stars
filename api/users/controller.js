@@ -52,10 +52,13 @@ function usersController(server) {
         const userData = _.pick(req.body, ['email', 'password', 'username']);
         const requestUser = Users(userData);
 
-        requestUser.save(errorHandler(res));
+        requestUser.save(errorHandler(res, () => {
+          req.body.grant_type = 'password';
+          next();
+        }));
       }
     }
-  });
+  }, server.oauth.grant());
 
   server.post('/api/profile', server.oauth.authorise(), (req, res, next) => {
     const requestDataStructure = {
