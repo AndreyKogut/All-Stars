@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Node/angular2 website",
   "main": "app.js",
+  "engines": {
+    "node": "6.10.0",
+    "npm": "3.10.10"
+  },
   "scripts": {
     "postinstall": "webpack -p",
     "test": "echo \"Error: no test specified\" && exit 1",
