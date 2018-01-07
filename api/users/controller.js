@@ -256,7 +256,7 @@ function usersController(server) {
   server.get('/api/users/:id', server.oauth.authorise(), (req, res) => {
     const options = { auth: 0, password: 0, __v: 0 };
 
-    Users.findOne({}, options, errorHandler(res, getProfile));
+    Users.findOne({ _id: req.params.id }, options, errorHandler(res, getProfile));
 
     function getProfile(user) {
       const transform = _.assignWith(user.toJSON(), {
